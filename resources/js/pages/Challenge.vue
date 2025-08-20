@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
-import { onMounted, ref } from 'vue';
+import { ArcElement, BarElement, CategoryScale, Chart as ChartJS, Legend, LinearScale, LineElement, PointElement, Title, Tooltip } from 'chart.js';
+import { computed, onMounted, ref } from 'vue';
+import { Doughnut, Line } from 'vue-chartjs';
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement);
 
 // Reactive data
 const reportData = ref<any>(null);
@@ -150,6 +154,154 @@ const formatCurrency = (value: number) => {
     }).format(value);
 };
 
+// Chart data computed properties
+const monthlyRevenueData = computed(() => {
+    if (!reportData.value) return null;
+
+    const months = reportData.value.columns.filter((col: any) => col.type === 'Actual').map((col: any) => col.month);
+
+    // Get revenue from sheep income
+    const sheepIncome = reportData.value.sections
+        .find((s: any) => s.id === 'income')
+        ?.subsections.find((s: any) => s.id === 'sheep')
+        ?.subsections.find((s: any) => s.id === 'sheep_income')
+        ?.line_items.find((item: any) => item.name === 'Sales');
+
+    const salesData = sheepIncome ? sheepIncome.values.slice(0, -1) : [];
+
+    return {
+        labels: months,
+        datasets: [
+            {
+                label: 'Monthly Sales Revenue',
+                data: salesData,
+                borderColor: 'rgb(59, 130, 246)',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+            },
+        ],
+    };
+});
+
+const profitTrendData = computed(() => {
+    if (!reportData.value) return null;
+
+    const months = reportData.value.columns.filter((col: any) => col.type === 'Actual').map((col: any) => col.month);
+
+    const grossProfit = reportData.value.sections.find((s: any) => s.id === 'income')?.total?.values.slice(0, -1) || [];
+    const netProfit = reportData.value.summary.find((s: any) => s.name === 'Net Profit')?.values.slice(0, -1) || [];
+    const operatingExpenses = reportData.value.sections.find((s: any) => s.id === 'operating_expenses')?.total?.values.slice(0, -1) || [];
+
+    return {
+        labels: months,
+        datasets: [
+            {
+                label: 'Gross Profit',
+                data: grossProfit,
+                borderColor: 'rgb(34, 197, 94)',
+                backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                borderWidth: 2,
+                fill: false,
+                tension: 0.4,
+            },
+            {
+                label: 'Net Profit',
+                data: netProfit,
+                borderColor: 'rgb(59, 130, 246)',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderWidth: 2,
+                fill: false,
+                tension: 0.4,
+            },
+            {
+                label: 'Operating Expenses',
+                data: operatingExpenses,
+                borderColor: 'rgb(239, 68, 68)',
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                borderWidth: 2,
+                fill: false,
+                tension: 0.4,
+            },
+        ],
+    };
+});
+
+const expenseBreakdownData = computed(() => {
+    if (!reportData.value) return null;
+
+    const expenseSection = reportData.value.sections.find((s: any) => s.id === 'operating_expenses');
+    if (!expenseSection) return null;
+
+    const lineItems = expenseSection.subsections
+        .flatMap((sub: any) => sub.line_items || [])
+        .filter((item: any) => item.values[item.values.length - 1] > 0);
+
+    return {
+        labels: lineItems.map((item: any) => item.name),
+        datasets: [
+            {
+                data: lineItems.map((item: any) => item.values[item.values.length - 1]),
+                backgroundColor: [
+                    'rgba(239, 68, 68, 0.8)',
+                    'rgba(245, 158, 11, 0.8)',
+                    'rgba(168, 85, 247, 0.8)',
+                    'rgba(14, 165, 233, 0.8)',
+                    'rgba(34, 197, 94, 0.8)',
+                    'rgba(236, 72, 153, 0.8)',
+                ],
+                borderWidth: 2,
+                borderColor: '#fff',
+            },
+        ],
+    };
+});
+
+const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: {
+            position: 'top' as const,
+        },
+        tooltip: {
+            callbacks: {
+                label: function (context: any) {
+                    return context.dataset.label + ': ' + formatCurrency(context.parsed.y || context.parsed);
+                },
+            },
+        },
+    },
+    scales: {
+        y: {
+            beginAtZero: true,
+            ticks: {
+                callback: function (value: any) {
+                    return formatCurrency(value);
+                },
+            },
+        },
+    },
+};
+
+const doughnutOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: {
+            position: 'right' as const,
+        },
+        tooltip: {
+            callbacks: {
+                label: function (context: any) {
+                    return context.label + ': ' + formatCurrency(context.parsed);
+                },
+            },
+        },
+    },
+};
+
 onMounted(() => {
     fetchFinancialData();
 });
@@ -191,6 +343,36 @@ onMounted(() => {
                         <p class="text-sm text-gray-600">{{ reportData.company.basis }}</p>
                         <p class="text-sm text-gray-600">{{ reportData.company.period }}</p>
                         <p class="mt-1 text-xs text-gray-500">Actuals to {{ reportData.company.actuals_to }}</p>
+                    </div>
+                </div>
+
+                <!-- Financial Trend Charts -->
+                <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                    <!-- Monthly Revenue Trend -->
+                    <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-lg">
+                        <h3 class="mb-4 text-lg font-semibold text-gray-900">📈 Monthly Sales Revenue Trend</h3>
+                        <div class="h-80">
+                            <Line v-if="monthlyRevenueData" :data="monthlyRevenueData" :options="chartOptions" />
+                            <div v-else class="flex h-full items-center justify-center text-gray-500">No revenue data available</div>
+                        </div>
+                    </div>
+
+                    <!-- Profit & Expense Trends -->
+                    <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-lg">
+                        <h3 class="mb-4 text-lg font-semibold text-gray-900">💰 Profit & Expense Trends</h3>
+                        <div class="h-80">
+                            <Line v-if="profitTrendData" :data="profitTrendData" :options="chartOptions" />
+                            <div v-else class="flex h-full items-center justify-center text-gray-500">No profit data available</div>
+                        </div>
+                    </div>
+
+                    <!-- Expense Breakdown -->
+                    <div class="col-span-1 rounded-lg border border-gray-200 bg-white p-6 shadow-lg lg:col-span-2">
+                        <h3 class="mb-4 text-lg font-semibold text-gray-900">🏷️ Operating Expenses Breakdown</h3>
+                        <div class="mx-auto h-80 max-w-md">
+                            <Doughnut v-if="expenseBreakdownData" :data="expenseBreakdownData" :options="doughnutOptions" />
+                            <div v-else class="flex h-full items-center justify-center text-gray-500">No expense data available</div>
+                        </div>
                     </div>
                 </div>
 
