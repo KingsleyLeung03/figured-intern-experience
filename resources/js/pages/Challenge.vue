@@ -38,6 +38,17 @@ const generateCommentary = async () => {
         aiLoading.value = true;
         aiError.value = null;
 
+        // Prepare financial data summary for AI analysis
+        const financialSummary = prepareFinancialSummary();
+
+        // Combine user prompt with financial data
+        const fullPrompt = `Based on the following financial data for ${reportData.value?.company?.name}, please ${aiPrompt.value}
+
+FINANCIAL DATA SUMMARY:
+${financialSummary}
+
+Please provide insights based on this actual financial data.`;
+
         const response = await fetch('/api/generate-commentary', {
             method: 'POST',
             headers: {
@@ -45,7 +56,7 @@ const generateCommentary = async () => {
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
             },
             body: JSON.stringify({
-                prompt: aiPrompt.value,
+                prompt: fullPrompt,
             }),
         });
 
@@ -60,6 +71,72 @@ const generateCommentary = async () => {
     } finally {
         aiLoading.value = false;
     }
+};
+
+// Prepare financial data summary for AI analysis
+const prepareFinancialSummary = () => {
+    if (!reportData.value) return 'No financial data available';
+
+    const { company, sections, summary } = reportData.value;
+
+    let summaryText = `Company: ${company.name}\n`;
+    summaryText += `Report Type: ${company.report_type}\n`;
+    summaryText += `Period: ${company.period}\n\n`;
+
+    // Add key financial metrics
+    const netProfit = summary.find((s: any) => s.name === 'Net Profit');
+    const operatingSurplus = summary.find((s: any) => s.name === 'Operating Surplus');
+
+    if (netProfit) {
+        const totalNetProfit = netProfit.values[netProfit.values.length - 1];
+        summaryText += `Total Net Profit: ${formatCurrency(totalNetProfit)}\n`;
+    }
+
+    if (operatingSurplus) {
+        const totalOperatingSurplus = operatingSurplus.values[operatingSurplus.values.length - 1];
+        summaryText += `Total Operating Surplus: ${formatCurrency(totalOperatingSurplus)}\n\n`;
+    }
+
+    // Add section totals
+    sections.forEach((section: any) => {
+        if (section.total) {
+            const totalValue = section.total.values[section.total.values.length - 1];
+            summaryText += `${section.total.name}: ${formatCurrency(totalValue)}\n`;
+        }
+    });
+
+    // Add key line items
+    summaryText += '\nKey Revenue Sources:\n';
+    sections.forEach((section: any) => {
+        if (section.id === 'income') {
+            section.subsections?.forEach((subsection: any) => {
+                subsection.subsections?.forEach((subsubsection: any) => {
+                    if (subsubsection.id === 'sheep_income') {
+                        subsubsection.line_items?.forEach((item: any) => {
+                            const totalValue = item.values[item.values.length - 1];
+                            summaryText += `- ${item.name}: ${formatCurrency(totalValue)}\n`;
+                        });
+                    }
+                });
+            });
+        }
+    });
+
+    summaryText += '\nKey Expenses:\n';
+    sections.forEach((section: any) => {
+        if (section.id === 'operating_expenses') {
+            section.subsections?.forEach((subsection: any) => {
+                subsection.line_items?.forEach((item: any) => {
+                    const totalValue = item.values[item.values.length - 1];
+                    if (totalValue > 0) {
+                        summaryText += `- ${item.name}: ${formatCurrency(totalValue)}\n`;
+                    }
+                });
+            });
+        }
+    });
+
+    return summaryText;
 };
 
 // Format currency values
@@ -310,19 +387,30 @@ onMounted(() => {
 
                 <!-- AI Commentary Demo -->
                 <div class="rounded-lg border border-green-200 bg-green-50 p-6">
-                    <h3 class="mb-3 text-lg font-semibold text-green-900">🤖 AI Commentary (Prism Demo)</h3>
+                    <h3 class="mb-3 text-lg font-semibold text-green-900">🤖 AI Financial Analysis (Prism Demo)</h3>
+                    <p class="mb-4 text-sm text-green-700">
+                        Ask AI to analyze the actual financial data from {{ reportData.company.name }}. The AI will review the complete P&L report and
+                        provide insights.
+                    </p>
 
                     <div class="space-y-4">
                         <div>
-                            <label for="ai-prompt" class="mb-2 block text-sm font-medium text-green-800"> Ask AI a question: </label>
+                            <label for="ai-prompt" class="mb-2 block text-sm font-medium text-green-800"> Ask AI about the financial data: </label>
                             <input
                                 id="ai-prompt"
                                 v-model="aiPrompt"
                                 type="text"
-                                placeholder="e.g., What are some general business insights?"
+                                placeholder="e.g., analyze the profitability trends, identify key revenue drivers, or assess expense management"
                                 class="w-full rounded-lg border border-green-300 p-3 focus:border-transparent focus:ring-2 focus:ring-green-500"
                                 :disabled="aiLoading"
                             />
+                            <div class="mt-2 text-xs text-green-600">
+                                <strong>Try these examples:</strong><br />
+                                • "analyze the profitability trends and seasonal patterns"<br />
+                                • "identify the main revenue drivers and suggest improvements"<br />
+                                • "assess the expense management and cost structure"<br />
+                                • "provide recommendations for improving financial performance"
+                            </div>
                         </div>
 
                         <button
@@ -330,7 +418,7 @@ onMounted(() => {
                             :disabled="!aiPrompt.trim() || aiLoading"
                             class="rounded-lg bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            {{ aiLoading ? 'Generating...' : 'Generate Commentary' }}
+                            {{ aiLoading ? 'Analyzing Financial Data...' : 'Generate Financial Analysis' }}
                         </button>
 
                         <div v-if="aiError" class="rounded-lg border border-red-200 bg-red-50 p-4">
@@ -338,8 +426,10 @@ onMounted(() => {
                         </div>
 
                         <div v-if="aiResponse" class="rounded-lg border border-green-200 bg-white p-4">
-                            <h4 class="mb-2 font-medium text-green-800">AI Response:</h4>
-                            <p class="text-sm whitespace-pre-wrap text-gray-700">{{ aiResponse }}</p>
+                            <h4 class="mb-2 font-medium text-green-800">AI Financial Analysis:</h4>
+                            <div class="prose prose-sm max-w-none text-gray-700">
+                                <pre class="font-sans whitespace-pre-wrap">{{ aiResponse }}</pre>
+                            </div>
                         </div>
                     </div>
                 </div>
