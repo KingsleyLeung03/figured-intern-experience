@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
 import { ref, onMounted } from 'vue';
+import FinancialReportTable from '../components/FinancialReportTable.vue';
 
 // Reactive data
 const reportData = ref<any>(null);
@@ -108,82 +109,72 @@ onMounted(() => {
       </div>
 
       <!-- Basic Report Display -->
-      <div v-else-if="reportData" class="space-y-8">
-        
-        <!-- Company Info -->
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 class="text-xl font-semibold text-gray-900 mb-4">{{ reportData.company.name }}</h2>
-          <div class="text-sm text-gray-600">{{ reportData.company.report_type }}</div>
-        </div>
-
-        <!-- Challenge Instructions -->
-        <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <h3 class="text-blue-900 font-semibold text-lg mb-3">🎯 Your Challenge</h3>
-          <div class="text-blue-800 space-y-2">
-            <p>Build a complete, interactive Profit & Loss report using the provided financial data.</p>
-            <p>The data is available in <code class="bg-blue-100 px-1 rounded">reportData</code> - explore it and create a professional financial report interface.</p>
+        <div v-else-if="reportData" class="space-y-8">
+          <!-- Challenge Instructions -->
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <h3 class="text-blue-900 font-semibold text-lg mb-3">🎯 Your Challenge</h3>
+            <div class="text-blue-800 space-y-2">
+              <p>Build a complete, interactive Profit & Loss report using the provided financial data.</p>
+              <p>The data is available in <code class="bg-blue-100 px-1 rounded">reportData</code> - explore it and create a professional financial report interface.</p>
+            </div>
           </div>
-        </div>
 
-        <!-- AI Commentary Demo -->
-        <div class="bg-green-50 border border-green-200 rounded-lg p-6">
-          <h3 class="text-green-900 font-semibold text-lg mb-3">🤖 AI Commentary (Prism Demo)</h3>
-          
-          <div class="space-y-4">
-            <div>
-              <label for="ai-prompt" class="block text-sm font-medium text-green-800 mb-2">
-                Ask AI a question:
-              </label>
-              <input
-                id="ai-prompt"
-                v-model="aiPrompt"
-                type="text"
-                placeholder="e.g., What are some general business insights?"
-                class="w-full p-3 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                :disabled="aiLoading"
+          <!-- Financial Report Table -->
+          <FinancialReportTable :reportData="reportData" />
+
+          <!-- AI Commentary Demo -->
+          <div class="bg-green-50 border border-green-200 rounded-lg p-6">
+            <h3 class="text-green-900 font-semibold text-lg mb-3">🤖 AI Commentary (Prism Demo)</h3>
+            <div class="space-y-4">
+              <div>
+                <label for="ai-prompt" class="block text-sm font-medium text-green-800 mb-2">
+                  Ask AI a question:
+                </label>
+                <input
+                  id="ai-prompt"
+                  v-model="aiPrompt"
+                  type="text"
+                  placeholder="e.g., What are some general business insights?"
+                  class="w-full p-3 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  :disabled="aiLoading"
+                >
+              </div>
+              <button
+                @click="generateCommentary"
+                :disabled="!aiPrompt.trim() || aiLoading"
+                class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
+                {{ aiLoading ? 'Generating...' : 'Generate Commentary' }}
+              </button>
+              <div v-if="aiError" class="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p class="text-red-800 text-sm">{{ aiError }}</p>
+              </div>
+              <div v-if="aiResponse" class="bg-white border border-green-200 rounded-lg p-4">
+                <h4 class="font-medium text-green-800 mb-2">AI Response:</h4>
+                <p class="text-gray-700 text-sm whitespace-pre-wrap">{{ aiResponse }}</p>
+              </div>
             </div>
-            
-            <button
-              @click="generateCommentary"
-              :disabled="!aiPrompt.trim() || aiLoading"
-              class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {{ aiLoading ? 'Generating...' : 'Generate Commentary' }}
-            </button>
-            
-            <div v-if="aiError" class="bg-red-50 border border-red-200 rounded-lg p-4">
-              <p class="text-red-800 text-sm">{{ aiError }}</p>
-            </div>
-            
-            <div v-if="aiResponse" class="bg-white border border-green-200 rounded-lg p-4">
-              <h4 class="font-medium text-green-800 mb-2">AI Response:</h4>
-              <p class="text-gray-700 text-sm whitespace-pre-wrap">{{ aiResponse }}</p>
+          </div>
+          <!-- Challenge Links -->
+          <div class="text-center py-8 border-t border-gray-200">
+            <div class="space-x-4">
+              <a 
+                href="/CHALLENGE.md" 
+                target="_blank"
+                class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 inline-flex items-center"
+              >
+                📋 Challenge Requirements
+              </a>
+              <a 
+                href="/api/financial-report" 
+                target="_blank"
+                class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 inline-flex items-center"
+              >
+                🔗 API Data
+              </a>
             </div>
           </div>
         </div>
-
-        <!-- Challenge Links -->
-        <div class="text-center py-8 border-t border-gray-200">
-          <div class="space-x-4">
-            <a 
-              href="/CHALLENGE.md" 
-              target="_blank"
-              class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 inline-flex items-center"
-            >
-              📋 Challenge Requirements
-            </a>
-            <a 
-              href="/api/financial-report" 
-              target="_blank"
-              class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 inline-flex items-center"
-            >
-              🔗 API Data
-            </a>
-          </div>
-        </div>
-
-      </div>
     </div>
   </div>
 </template>
